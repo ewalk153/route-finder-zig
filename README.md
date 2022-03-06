@@ -15,5 +15,6 @@ Progress:
  - [ ] implement single source to all-destination Dijkstra
  - [ ] write results out as a csv file (could be a file or stdout)
  - [ ] demonstrate importing code from another repository (perhaps)
+ - [ ] convert Dijkstra routines to process generic types
 
 `build_nodes.zig` holds the main code for this project.
