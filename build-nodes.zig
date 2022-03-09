@@ -2,9 +2,10 @@ const std = @import("std");
 const Edge = @import("./edge.zig").Edge;
 const Node = @import("./node.zig").Node;
 const ArrayList = std.ArrayList;
+const Allocator = std.mem.Allocator;
 const Order = std.math.Order;
 
-pub fn readLines(allocator: anytype, filename: []const u8) ![]const LineTime {
+pub fn readLines(allocator: Allocator, filename: []const u8) ![]const LineTime {
     var lines = ArrayList(LineTime).init(allocator);
 
     var file = try std.fs.cwd().openFile(filename, .{});
@@ -88,7 +89,7 @@ const Structure = struct {
 
     const Self = @This();
 
-    pub fn build(allocator: anytype, lines: []const LineTime) !Structure {
+    pub fn build(allocator: Allocator, lines: []const LineTime) !Structure {
         var nodeMap = std.StringHashMap(Node).init(allocator);
         var i: i32 = 0;
         for (lines) |line| {
@@ -160,7 +161,7 @@ const Graph = struct {
 
     const Self = @This();
 
-    pub fn build(allocator: anytype, routeEdges: ArrayList(Edge)) !Self {
+    pub fn build(allocator: Allocator, routeEdges: ArrayList(Edge)) !Self {
         var edges = std.AutoHashMap(i32, ArrayList(GraphEdge)).init(allocator); 
         for(routeEdges.items) |routeEdge| {
             const e = GraphEdge {
@@ -194,7 +195,7 @@ const Graph = struct {
     // add switch costs for lines, onces there is more than one
     // line
     // convert to multi-path
-    pub fn route(self: Graph, allocator: anytype, source: i32, destination: i32) !i32 {
+    pub fn route(self: Graph, allocator: Allocator, source: i32, destination: i32) !i32 {
         var dist = std.AutoHashMap(i32, i32).init(allocator);
         const PQltNode = std.PriorityQueue(CostNode, void, lessThan);
         var q = PQltNode.init(allocator, {});
