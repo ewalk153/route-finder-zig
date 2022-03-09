@@ -153,7 +153,7 @@ pub const GraphEdge = struct {
     startId: i32,
     endId: i32,
     cost: i32,
-    line: []const u8, // todo, convert to array of lines
+    line: ArrayList([]const u8),
 };
 
 const Graph = struct {
@@ -164,18 +164,38 @@ const Graph = struct {
     pub fn build(allocator: Allocator, routeEdges: ArrayList(Edge)) !Self {
         var edges = std.AutoHashMap(i32, ArrayList(GraphEdge)).init(allocator); 
         for(routeEdges.items) |routeEdge| {
+            var line = ArrayList([]const u8).init(allocator);
+            try line.append(routeEdge.line);
             const e = GraphEdge {
                 .startId = routeEdge.start,
                 .endId = routeEdge.end,
                 .cost = routeEdge.cost,
-                .line = routeEdge.line,
+                .line = line,
             };
 
             var v = try edges.getOrPut(routeEdge.start);
             if (!v.found_existing) {
                 v.value_ptr.* = ArrayList(GraphEdge).init(allocator);
-            } 
-            try v.value_ptr.*.append(e);
+                try v.value_ptr.*.append(e);
+            } else {
+                var found = false;
+                for(v.value_ptr.*.items) |edge, i| {
+                    if(edge.endId == routeEdge.end) {
+                        found = true;
+                        var e2 = edge;
+                        try e2.line.append(routeEdge.line);
+                        var newEdgeList = [_]GraphEdge{e2};
+                        try v.value_ptr.*.replaceRange(i, 0, &newEdgeList);
+                        break;
+                    }
+                }
+                if (!found) {
+                    try v.value_ptr.*.append(e);
+                } else {
+                    // todo, debug to confirm lists are properly replaced
+                    // std.debug.print("Second path found for element {s}\n", .{e});
+                }
+            }
         }
         return Self {
             .edges = edges,
