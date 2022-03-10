@@ -2,7 +2,8 @@ const std = @import("std");
 const Edge = @import("./edge.zig").Edge;
 const Node = @import("./node.zig").Node;
 const ArrayList = std.ArrayList;
-const Allocator = std.mem.Allocator;
+const mem = std.mem;
+const Allocator = mem.Allocator;
 const Order = std.math.Order;
 const PathHistoryHash = @import("./array_val_hash.zig").ArrayValHash(i32, GraphEdge);
 
@@ -232,14 +233,20 @@ const Graph = struct {
 
         while(q.removeOrNull()) |val| {
             var currentPath = pathH.get(val.id);
+            var currentEdgeLine = ArrayList([]const u8).init(allocator);
+            if(currentPath.items.len > 0) {
+                currentEdgeLine = currentPath.items[currentPath.items.len - 1].line;
+            }
             if(val.id == destination) {
                 return routeHistory {
                     .cost = val.cost,
                     .path = currentPath.items,
                 };
             }
-            if(dist.get(val.id)) |_| {
-                continue;
+            if(dist.get(val.id)) |last_cost| {
+                if(val.cost >= last_cost) {
+                    continue;
+                }
             }
             try dist.put(val.id, val.cost);
             if (self.edges.get(val.id)) |paths| {
@@ -251,9 +258,14 @@ const Graph = struct {
                     try newPath.appendSlice(currentPath.items);
                     try newPath.append(path);
                     try pathH.putAll(path.endId, newPath);
+                    var switchCost: i32 = 0;
+                    if(!matchedString(currentEdgeLine, path.line)) {
+                        switchCost = 15;
+                    }
+
                     try q.add(CostNode{
                         .id = path.endId,
-                        .cost = val.cost + path.cost,
+                        .cost = val.cost + path.cost + switchCost,
                     });
                 }
             }
@@ -264,6 +276,17 @@ const Graph = struct {
         };
     }
 };
+
+pub fn matchedString(first: ArrayList([]const u8), second: ArrayList([]const u8)) bool {
+    for(first.items) |fItem| {
+        for(second.items) |sItem| {
+            if (mem.eql(u8, fItem, sItem)) {
+                return true;
+            }
+        }
+    }
+    return false;
+}
 
 pub fn main() !void {
     var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
