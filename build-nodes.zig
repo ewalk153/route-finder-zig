@@ -4,6 +4,7 @@ const Node = @import("./node.zig").Node;
 const ArrayList = std.ArrayList;
 const Allocator = std.mem.Allocator;
 const Order = std.math.Order;
+const PathHistoryHash = @import("./array_val_hash.zig").ArrayValHash(i32, GraphEdge);
 
 pub fn readLines(allocator: Allocator, filename: []const u8) ![]const LineTime {
     var lines = ArrayList(LineTime).init(allocator);
@@ -215,8 +216,13 @@ const Graph = struct {
     // add switch costs for lines, onces there is more than one
     // line
     // convert to multi-path
-    pub fn route(self: Graph, allocator: Allocator, source: i32, destination: i32) !i32 {
+    pub const routeHistory = struct {
+        cost: i32,
+        path: []const(GraphEdge),
+    };
+    pub fn route(self: Graph, allocator: Allocator, source: i32, destination: i32) !routeHistory {
         var dist = std.AutoHashMap(i32, i32).init(allocator);
+        var pathH = PathHistoryHash.init(allocator);
         const PQltNode = std.PriorityQueue(CostNode, void, lessThan);
         var q = PQltNode.init(allocator, {});
         try q.add(CostNode{
@@ -225,20 +231,26 @@ const Graph = struct {
         });
 
         while(q.removeOrNull()) |val| {
+            var currentPath = pathH.get(val.id);
             if(val.id == destination) {
-                return val.cost;
+                return routeHistory {
+                    .cost = val.cost,
+                    .path = currentPath.items,
+                };
             }
-            if(dist.get(val.id)) |x| {
-                _ = x;
+            if(dist.get(val.id)) |_| {
                 continue;
             }
             try dist.put(val.id, val.cost);
             if (self.edges.get(val.id)) |paths| {
                 for(paths.items) |path| {
-                    if(dist.get(path.endId)) |x| {
-                        _ = x;
+                    if(dist.get(path.endId)) |_| {
                         continue;
                     }
+                    var newPath = ArrayList(GraphEdge).init(allocator);
+                    try newPath.appendSlice(currentPath.items);
+                    try newPath.append(path);
+                    try pathH.putAll(path.endId, newPath);
                     try q.add(CostNode{
                         .id = path.endId,
                         .cost = val.cost + path.cost,
@@ -246,7 +258,10 @@ const Graph = struct {
                 }
             }
         }
-        return -1;
+        return routeHistory {
+            .cost = -1,
+            .path = &[_]GraphEdge{},
+        };
     }
 };
 
@@ -268,17 +283,24 @@ pub fn main() !void {
 
     var g = try Graph.build(allocator, structures.edges);
 
-    if (g.edges.get(10)) |paths| {
-        std.debug.print("{s}\n", .{paths.items});
-    } else {
-        std.debug.print("Nothing found for 0\n", .{});
-    }
+    // if (g.edges.get(10)) |paths| {
+    //     std.debug.print("{s}\n", .{paths.items});
+    // } else {
+    //     std.debug.print("Nothing found for 0\n", .{});
+    // }
 
     // std.debug.print("{}\n", .{g.edges.count()});
 
-    var cost = try g.route(allocator, 1, 216);
+    var result = try g.route(allocator, 1, 216);
 
-    std.debug.print("{}\n", .{cost});
+    std.debug.print("Cost: {}\n", .{result.cost});
+
+    // clearly, there is a bug in either our route finding, and/or backtrack checking
+    for(result.path) |el| {
+        std.debug.print("Step: {}->{}\n", .{el.startId, el.endId});
+    }
+
+    std.debug.print("{}\n", .{result.path.len});
 
     std.debug.print("done\n", .{});
 }
