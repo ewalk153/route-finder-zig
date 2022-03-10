@@ -13,7 +13,7 @@ Progress:
  - [x] split project into multiple files
  - [x] add backtracking
  - [x] given the problem domain is train routes, lay on train line switching costs
- - [ ] implement single source to all-destination Dijkstra
+ - [x] implement single source to all-destination Dijkstra
  - [ ] write results out as a csv file (could be a file or stdout)
  - [ ] demonstrate importing code from another repository (perhaps)
  - [ ] convert Dijkstra routines to process generic types

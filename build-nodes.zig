@@ -227,7 +227,7 @@ const Graph = struct {
         const PQltNode = std.PriorityQueue(CostNode, void, lessThan);
         var q = PQltNode.init(allocator, {});
         try q.add(CostNode{
-            .id = source, 
+            .id = source,
             .cost = 0,
         });
 
@@ -275,6 +275,60 @@ const Graph = struct {
             .path = &[_]GraphEdge{},
         };
     }
+
+    pub fn multiRoute(self: Graph, allocator: Allocator, source: i32) !RouteResults {
+        var dist = std.AutoHashMap(i32, i32).init(allocator);
+        var pathH = PathHistoryHash.init(allocator);
+        const PQltNode = std.PriorityQueue(CostNode, void, lessThan);
+        var q = PQltNode.init(allocator, {});
+        try q.add(CostNode{
+            .id = source,
+            .cost = 0,
+        });
+
+        while(q.removeOrNull()) |val| {
+            var currentPath = pathH.get(val.id);
+            var currentEdgeLine = ArrayList([]const u8).init(allocator);
+            if(currentPath.items.len > 0) {
+                currentEdgeLine = currentPath.items[currentPath.items.len - 1].line;
+            }
+            if(dist.get(val.id)) |last_cost| {
+                if(val.cost >= last_cost) {
+                    continue;
+                }
+            }
+            try dist.put(val.id, val.cost);
+            if (self.edges.get(val.id)) |paths| {
+                for(paths.items) |path| {
+                    if(dist.get(path.endId)) |_| {
+                        continue;
+                    }
+                    var newPath = ArrayList(GraphEdge).init(allocator);
+                    try newPath.appendSlice(currentPath.items);
+                    try newPath.append(path);
+                    try pathH.putAll(path.endId, newPath);
+                    var switchCost: i32 = 0;
+                    if(!matchedString(currentEdgeLine, path.line)) {
+                        switchCost = 15;
+                    }
+
+                    try q.add(CostNode{
+                        .id = path.endId,
+                        .cost = val.cost + path.cost + switchCost,
+                    });
+                }
+            }
+        }
+        return RouteResults{
+            .costs = dist,
+            .paths = pathH,
+        };
+    }
+};
+
+pub const RouteResults = struct {
+    costs: std.AutoHashMap(i32, i32),
+    paths: PathHistoryHash,
 };
 
 pub fn matchedString(first: ArrayList([]const u8), second: ArrayList([]const u8)) bool {
@@ -324,6 +378,12 @@ pub fn main() !void {
     }
 
     std.debug.print("{}\n", .{result.path.len});
+
+    var result2 = try g.multiRoute(allocator, 1);
+    var it = result2.costs.iterator();
+    while(it.next()) |entry| {
+        std.debug.print("{}=>{}\n", .{entry.key_ptr.*, entry.value_ptr.*});
+    }
 
     std.debug.print("done\n", .{});
 }
