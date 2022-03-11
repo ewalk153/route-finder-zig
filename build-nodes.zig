@@ -39,13 +39,13 @@ const LineTime = struct {
         var it = std.mem.tokenize(u8, line, "\t");
 
         if (it.next()) |item| {
-            try name.appendSlice(item);
+            try name.appendSlice(mem.trimRight(u8, item, std.ascii.spaces[0..]));
         }
         if (it.next()) |item| {
-            try startStation.appendSlice(item);
+            try startStation.appendSlice(mem.trimRight(u8, item, std.ascii.spaces[0..]));
         }
         if (it.next()) |item| {
-            try endStation.appendSlice(item);
+            try endStation.appendSlice(mem.trimRight(u8, item, std.ascii.spaces[0..]));
         }
         if (it.next()) |item| {
             var timeSplit = std.mem.split(u8, item, ":");
@@ -94,7 +94,12 @@ const Structure = struct {
     pub fn build(allocator: Allocator, lines: []const LineTime) !Structure {
         var nodeMap = std.StringHashMap(Node).init(allocator);
         var i: i32 = 0;
+        var first = true;
         for (lines) |line| {
+            if(first) {
+                first = false;
+                continue;
+            }
             var v = try nodeMap.getOrPut(line.startStation);
             if (!v.found_existing) {
                 v.value_ptr.* = Node {
@@ -109,7 +114,7 @@ const Structure = struct {
         for (lines) |line| {
             if (nodeMap.get(line.startStation)) |startNode| {
                 if (nodeMap.get(line.endStation)) |endNode| {
-                    if (line.oneWay == 0 or line.oneWay == 1) {
+                    if (line.oneWay == 0 or line.oneWay == -1) {
                         try edges.append(
                             Edge {
                                 .start = startNode.id,
@@ -121,7 +126,7 @@ const Structure = struct {
                     }
                 }
                 if (nodeMap.get(line.endStation)) |endNode| {
-                    if (line.oneWay == 0 or line.oneWay == -1) {
+                    if (line.oneWay == 0 or line.oneWay == 1) {
                         try edges.append(
                             Edge {
                                 .start = endNode.id,
@@ -160,11 +165,13 @@ pub const GraphEdge = struct {
 
 const Graph = struct {
     edges: std.AutoHashMap(i32, ArrayList(GraphEdge)),
+    maxId: i32,
 
     const Self = @This();
 
     pub fn build(allocator: Allocator, routeEdges: ArrayList(Edge)) !Self {
-        var edges = std.AutoHashMap(i32, ArrayList(GraphEdge)).init(allocator); 
+        var edges = std.AutoHashMap(i32, ArrayList(GraphEdge)).init(allocator);
+        var maxId: i32 = 0;
         for(routeEdges.items) |routeEdge| {
             var line = ArrayList([]const u8).init(allocator);
             try line.append(routeEdge.line);
@@ -174,6 +181,12 @@ const Graph = struct {
                 .cost = routeEdge.cost,
                 .line = line,
             };
+            if(routeEdge.start > maxId ){
+                maxId = routeEdge.start;
+            }
+            if(routeEdge.end > maxId) {
+                maxId = routeEdge.end;
+            }
 
             var v = try edges.getOrPut(routeEdge.start);
             if (!v.found_existing) {
@@ -201,6 +214,7 @@ const Graph = struct {
         }
         return Self {
             .edges = edges,
+            .maxId = maxId,
         };
     }
 
@@ -342,24 +356,7 @@ pub fn matchedString(first: ArrayList([]const u8), second: ArrayList([]const u8)
     return false;
 }
 
-pub fn main() !void {
-    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
-    defer arena.deinit();
-
-    const allocator = arena.allocator();
-
-    // // parse doc into line, source, destination, directionality (bi)
-    var lines = try readLines(allocator, "./lines.csv");
-    // // std.debug.print("{s}\n", .{lines});
-
-    // // build index of locations along the way
-    var structures = try Structure.build(allocator, lines);
-    // // write out nodes and edges based on index
-    // std.debug.print("{s}\n", .{structures.nodes.items});
-    // std.debug.print("{s}\n", .{structures.edges.items});
-
-    var g = try Graph.build(allocator, structures.edges);
-
+fn traverseGraph(allocator: Allocator, g: Graph) !void {
     // if (g.edges.get(10)) |paths| {
     //     std.debug.print("{s}\n", .{paths.items});
     // } else {
@@ -380,10 +377,52 @@ pub fn main() !void {
     std.debug.print("{}\n", .{result.path.len});
 
     var result2 = try g.multiRoute(allocator, 1);
+    _ = result2;
     var it = result2.costs.iterator();
     while(it.next()) |entry| {
         std.debug.print("{}=>{}\n", .{entry.key_ptr.*, entry.value_ptr.*});
     }
+    var i: i32 = 1;
+    while(i < g.maxId) : (i += 1) {
+        std.debug.print("{},{}\n", .{i, result2.costs.get(i).?}); //
+    }
+    std.debug.print("\n", .{});
+}
+
+fn cmpByNode(context: void, a: Node, b: Node) bool {
+    _ = context;
+    return a.id < b.id;
+}
+
+fn printNodes(allocator: Allocator, structures: Structure) !void {
+    _ = allocator;
+    var nodes = structures.nodes;
+    var x = nodes.toOwnedSlice();
+    std.sort.sort(Node, x, {}, cmpByNode);
+    for(x) |node| {
+        std.debug.print("{},{s}\n", .{node.id, node.name});
+    }
+
+}
+
+pub fn main() !void {
+    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
+    defer arena.deinit();
+
+    const allocator = arena.allocator();
+
+    // // parse doc into line, source, destination, directionality (bi)
+    var lines = try readLines(allocator, "./lines.csv");
+    // // std.debug.print("{s}\n", .{lines});
+
+    // // build index of locations along the way
+    var structures = try Structure.build(allocator, lines);
+    // try printNodes(allocator, structures);
+
+    var g = try Graph.build(allocator, structures.edges);
+    _ = g;
+
+    try traverseGraph(allocator, g);
 
     std.debug.print("done\n", .{});
 }
