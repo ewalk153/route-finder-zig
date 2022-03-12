@@ -3,6 +3,7 @@ const Edge = @import("./edge.zig").Edge;
 const Node = @import("./node.zig").Node;
 const ArrayList = std.ArrayList;
 const mem = std.mem;
+const io = std.io;
 const Allocator = mem.Allocator;
 const Order = std.math.Order;
 const PathHistoryHash = @import("./array_val_hash.zig").ArrayValHash(i32, GraphEdge);
@@ -356,6 +357,26 @@ pub fn matchedString(first: ArrayList([]const u8), second: ArrayList([]const u8)
     return false;
 }
 
+fn printMatrix(allocator: Allocator, g: Graph) !void {
+    var i: i32 = 0;
+    var j: i32 = 0;
+    while(i < g.maxId) : (i += 1) {
+        var result = try g.multiRoute(allocator, i);
+        j = 0;
+        while(j < g.maxId) : (j += 1) {
+            if(j > 0) {
+                print(",", .{});
+            }
+            if(result.costs.get(j)) |val| {
+                print("{}", .{val});
+            } else {
+                print("\nWARNING...{}->{} unreachable....\n\n", .{i, j});
+            }
+        }
+        print("\n", .{});
+    }
+}
+
 fn traverseGraph(allocator: Allocator, g: Graph) !void {
     // if (g.edges.get(10)) |paths| {
     //     std.debug.print("{s}\n", .{paths.items});
@@ -389,20 +410,38 @@ fn traverseGraph(allocator: Allocator, g: Graph) !void {
     std.debug.print("\n", .{});
 }
 
-fn cmpByNode(context: void, a: Node, b: Node) bool {
-    _ = context;
+fn cmpByNode(_: void, a: Node, b: Node) bool {
     return a.id < b.id;
 }
 
-fn printNodes(allocator: Allocator, structures: Structure) !void {
-    _ = allocator;
+fn printNodes(structures: Structure) !void {
     var nodes = structures.nodes;
     var x = nodes.toOwnedSlice();
     std.sort.sort(Node, x, {}, cmpByNode);
     for(x) |node| {
         std.debug.print("{},{s}\n", .{node.id, node.name});
     }
+}
 
+fn cmpByEdge(_: void, a: Edge, b: Edge) bool {
+    return a.start < b.start;
+}
+
+fn printEdges(structures: Structure) !void {
+    var edges = structures.edges;
+    var x = edges.toOwnedSlice();
+    std.sort.sort(Edge, x, {}, cmpByEdge);
+    for(x) |edge| {
+        print("{s},{},{}\n", .{edge.line, edge.start, edge.end});
+    }
+}
+
+var stdout_mutex = std.Thread.Mutex{};
+pub fn print(comptime fmt: []const u8, args: anytype) void {
+    stdout_mutex.lock();
+    defer stdout_mutex.unlock();
+    const stdout = io.getStdOut().writer();
+    nosuspend stdout.print(fmt, args) catch return;
 }
 
 pub fn main() !void {
@@ -417,12 +456,15 @@ pub fn main() !void {
 
     // // build index of locations along the way
     var structures = try Structure.build(allocator, lines);
-    // try printNodes(allocator, structures);
+    // try printNodes(structures);
+    try printEdges(structures);
 
     var g = try Graph.build(allocator, structures.edges);
     _ = g;
 
-    try traverseGraph(allocator, g);
+    // try traverseGraph(allocator, g);
 
-    std.debug.print("done\n", .{});
+    // try printMatrix(allocator, g);
+
+    // std.debug.print("done\n", .{});
 }
