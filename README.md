@@ -19,3 +19,7 @@ Progress:
  - [ ] convert Dijkstra routines to process generic types
 
 `build_nodes.zig` holds the main code for this project.
+
+# Resources for zig learning
+- https://ziglearn.org/ 
+- [Zig std library](https://github.com/ziglang/zig/tree/master/lib/std)
