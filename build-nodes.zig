@@ -419,7 +419,7 @@ fn printNodes(structures: Structure) !void {
     var x = nodes.toOwnedSlice();
     std.sort.sort(Node, x, {}, cmpByNode);
     for(x) |node| {
-        std.debug.print("{},{s}\n", .{node.id, node.name});
+        print("{},{s}\n", .{node.id, node.name});
     }
 }
 
@@ -456,7 +456,7 @@ pub fn main() !void {
 
     // // build index of locations along the way
     var structures = try Structure.build(allocator, lines);
-    // try printNodes(structures);
+    try printNodes(structures);
     try printEdges(structures);
 
     var g = try Graph.build(allocator, structures.edges);
@@ -466,5 +466,5 @@ pub fn main() !void {
 
     // try printMatrix(allocator, g);
 
-    // std.debug.print("done\n", .{});
+    std.debug.print("done\n", .{});
 }
